@@ -2,7 +2,8 @@ from urllib.parse import quote
 import requests
 import re
 import time
-from com.headersSetting import getHeader
+from com.config.headersSetting import getHeader
+from com.config.defaultImgLib import getImg
 
 if __name__ == '__main__':
     # 输入文件
@@ -33,33 +34,42 @@ if __name__ == '__main__':
                       "%2Fsearch%2F%3Fq%3D%25E8%2582%2596%25E7%2594%25B3%25E5%2585%258B%25E7%259A%2584%25E6%2595%2591%25E8%25B5%258E" \
                       "&t=201941619411174858" \
                       "&Ajax_CallBackArgument0={}&Ajax_CallBackArgument1=1&Ajax_CallBackArgument2=290&Ajax_CallBackArgument3=0&Ajax_CallBackArgument4=1";
-                # 对于异常情况下（如超时）的返回代码，循环访问直到返回正常结果
+                # 请求url，对于异常情况下（如超时）的返回代码，循环访问直到返回正常结果
                 try:
                     response = requests.get(url.format(quote(movie)), headers=getHeader())
-                    print(response)
                 except BaseException:
                     print(BaseException.__cause__)
                 while response.status_code != 200:
                     try:
-                        # response = requests.get(url.format(quote(movie)), headers=getHeader())
+                        # 请求url
                         response = requests.get(url.format(quote(movie)), headers=getHeader())
+                        time.sleep(3)
                     except BaseException:
-                        print(BaseException.__cause__)
                         print(response)
+                        print(BaseException.__cause__)
+
                 # 根据正则找到对应的图片地址，电影链接
                 imgFind = re.findall(imgPattern, response.content.decode('utf-8'))
                 urlFind = re.findall(urlPattern, response.content.decode('utf-8'))
-                # 若获取到图片地址，则写入对应列中
-                if (len(imgFind) > 0 and len(urlFind) > 0):
-                    record = line.strip() + "," + imgFind[0] + "," + urlFind[0] + "\n"
-                    print(" count = " + str(count) + "  title  " + lineData[1] + "       record:  " + record)
-                # 未获得图片地址的，在相应的列处补空
+
+                if len(imgFind) > 0 and len(url) > 0:
+                    # 检查获取到的图片是否有效
+                    for img in imgFind:
+                        imgResponse = requests.get(img, headers=getHeader())
+                        # 将有效的图片加入结果中
+                        if imgResponse.status_code == 200:
+                            record = line.strip() + "," + img + "," + urlFind[0] + "\n"
+                            break
+                        else:
+                            # 图片地址无效，在相应的列处补随机图片
+                            record = line.strip() + "," + getImg() + "," + urlFind[0] + "\n"
+                            print(" useless imgUrl = " + img)
                 else:
-                    record = line.strip() + ",,\n"
-                    print(" count = " + str(count) + "  title  " + lineData[1] + "       record:  " + record)
-                    print(response)
+                    # 未获得图片地址的，在相应的列处补随机图片
+                    record = line.strip() + "," + getImg() + "," + "http://movie.mtime.com/39528/" + "\n"
                 # 写入文件
                 write.write(record)
+                print("                count = " + str(count) + " " + record)
                 # 设置访问间隔为5秒
                 time.sleep(5)
         read.close()
